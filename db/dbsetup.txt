@@ -1,0 +1,175 @@
+# LearnHub Database Setup Instructions
+
+## Database Information
+- **Database Name:** learnhub
+- **Database Type:** MySQL 8.0
+- **Character Set:** utf8mb4
+- **Collation:** utf8mb4_unicode_ci
+
+## Tables Structure
+
+### Core Tables
+1. **users** - User accounts (students, instructors, admins)
+2. **courses** - Course information and metadata
+3. **course_modules** - Course content modules
+4. **enrollments** - Student course enrollments
+5. **module_progress** - Student progress tracking
+6. **notifications** - System notifications
+
+## Setup Instructions
+
+### Option 1: Using MySQL Command Line
+
+```bash
+# Create database
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS learnhub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+# Import schema
+mysql -u root -p learnhub < learnhub_schema_fresh.sql
+```
+
+### Option 2: Using Docker
+
+The database is automatically initialized when using docker-compose:
+
+```bash
+docker-compose up -d database
+```
+
+The init script (`learnhub_schema_fresh.sql`) will run automatically on first startup.
+
+## Default Credentials
+
+### Database User (for application)
+- **Username:** learnhub
+- **Password:** LearnHub2024!
+- **Host:** localhost (or 'database' in Docker)
+- **Port:** 3307 (Docker) or 3306 (local)
+
+### Root Access
+- **Username:** root
+- **Password:** Hello_there123
+
+## Environment Variables
+
+Create a `.env` file in `learnhub-api` directory:
+
+```env
+DB_HOST=localhost
+DB_PORT=3307
+DB_NAME=learnhub
+DB_USER=learnhub
+DB_PASS=LearnHub2024!
+JWT_SECRET=learnhub_secret_key_2024
+PORT=5000
+```
+
+## Table Relationships
+
+```
+users
+  ├─> courses (instructorId)
+  └─> enrollments (studentId)
+
+courses
+  ├─> course_modules (courseId)
+  └─> enrollments (courseId)
+
+enrollments
+  └─> module_progress (enrollmentId)
+
+course_modules
+  └─> module_progress (moduleId)
+```
+
+## Fresh Installation
+
+1. **Create Database:**
+   ```sql
+   CREATE DATABASE learnhub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+
+2. **Import Schema:**
+   ```bash
+   mysql -u root -p learnhub < learnhub_schema_fresh.sql
+   ```
+
+3. **Verify Tables:**
+   ```sql
+   USE learnhub;
+   SHOW TABLES;
+   ```
+
+4. **Start Application:**
+   - Configure `.env` file
+   - Run `npm install` in both frontend and backend
+   - Start backend: `cd learnhub-api && npm run dev`
+   - Start frontend: `cd learnhub-frontend && npm run dev`
+
+## Docker Deployment
+
+The database is fully configured in `docker-compose.yml`:
+
+```yaml
+database:
+  image: mysql:8.0
+  environment:
+    MYSQL_ROOT_PASSWORD: Hello_there123
+    MYSQL_DATABASE: learnhub
+    MYSQL_USER: learnhub
+    MYSQL_PASSWORD: LearnHub2024!
+  ports:
+    - "3307:3306"
+  volumes:
+    - learnhub_db_data:/var/lib/mysql
+    - ./db/learnhub_schema_fresh.sql:/docker-entrypoint-initdb.d/init.sql
+```
+
+## Maintenance
+
+### Backup Database
+```bash
+mysqldump -u root -p learnhub > backup_$(date +%Y%m%d).sql
+```
+
+### Reset Database
+```bash
+mysql -u root  -p -e "DROP DATABASE IF EXISTS learnhub; CREATE DATABASE learnhub CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -u root -p learnhub < learnhub_schema_fresh.sql
+```
+
+### Check Database Health
+```bash
+mysql -u root -p learnhub -e "
+SELECT 'Users' as TableName, COUNT(*) as Count FROM users
+UNION ALL SELECT 'Courses', COUNT(*) FROM courses
+UNION ALL SELECT 'Modules', COUNT(*) FROM course_modules
+UNION ALL SELECT 'Enrollments', COUNT(*) FROM enrollments;
+"
+```
+
+## Troubleshooting
+
+### Connection Issues
+- Verify MySQL is running: `systemctl status mysql`
+- Check port availability: `netstat -tuln | grep 3306`
+- Verify credentials in `.env` file
+
+### Permission Errors
+```sql
+GRANT ALL PRIVILEGES ON learnhub.* TO 'learnhub'@'localhost';
+GRANT ALL PRIVILEGES ON learnhub.* TO 'learnhub'@'%';
+FLUSH PRIVILEGES;
+```
+
+### Docker Issues
+- Check container logs: `docker logs learnhub-mysql`
+- Restart services: `docker-compose restart database`
+- Reset volumes: `docker-compose down -v && docker-compose up -d`
+
+## Notes
+
+- The schema includes all necessary tables and relationships
+- Database is clean (no sample data) for fresh deployments
+- Foreign key constraints are properly configured
+- Timestamps (createdAt, updatedAt) are automatically managed by Sequelize
